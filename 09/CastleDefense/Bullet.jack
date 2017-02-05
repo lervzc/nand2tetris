@@ -1,0 +1,95 @@
+/*
+	Castle Defense
+	Castle Defense is a simple shooter game inspired by metal slug
+	Player controls a single shooter and tries to defend his castle against incoming enemies
+	Author: Zac Ler
+*/
+class Bullet{
+	field int speed; // units per move
+	field int y_pos; // distance from ground to base of sprite
+	field int x_pos; // distance from left edge to left of sprite
+	field int move_cycle; // Current number of timestep
+	field int time_elasped; // Estimated time taken
+	field int memAddress; // memory address of current xy position
+
+	/*
+		Creates new bullet at position x,y
+	*/
+	constructor Bullet new(int x, int y) {
+		let speed = 2;
+		let y_pos = y;
+		let x_pos = x;
+		do draw();
+		return this;
+	}
+	/*
+		Perform a single timestep
+	*/
+	method int step(){
+		let time_elasped = 0;
+		if (move_cycle > 2){
+    		let move_cycle = 0;
+			do move();
+    	}else{
+    		let move_cycle = move_cycle + 1;
+    	}
+    	return time_elasped;
+	}
+	/*
+		Move bullet by speed units
+	*/
+	method void move(){
+		do clear();
+		let x_pos = x_pos + speed;
+		do draw();
+		return;
+	}
+	/*
+		Return bullet tip x position
+	*/
+	method int getXBound(){
+		return x_pos+5;
+	}
+	/*
+		Return bullet mid y position
+	*/
+	method int getYBound(){
+		return y_pos+1;
+	}
+
+	/*
+		Update memAddress to reflect current pos
+	*/
+	method int updateLocationAddress(){
+		var int tranform_y; 
+		let tranform_y = 238 - y_pos;
+		let memAddress = 16384 + (x_pos/16) + (tranform_y * 32);
+		return memAddress;
+	}
+	/*
+		Clears the bitmap
+	*/
+	method void clear(){
+		let time_elasped = time_elasped + 2; // fixed time for draws
+		do Memory.poke(memAddress+0, 0);
+		do Memory.poke(memAddress+32, 0);
+		return;
+	}
+	/*
+		Draw sprite
+	*/
+	method void draw(){
+		do updateLocationAddress();
+		let time_elasped = time_elasped + 2; // fixed time for draws
+		do Memory.poke(memAddress+0, 15);
+		do Memory.poke(memAddress+32, 30);
+		return;
+	}
+
+	/** Disposes this bullet. */
+	method void dispose() {
+		do clear();
+	  	do Memory.deAlloc(this);
+	  	return;
+	}
+}

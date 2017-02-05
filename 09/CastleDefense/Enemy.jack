@@ -1,0 +1,174 @@
+/*
+	Castle Defense
+	Castle Defense is a simple shooter game inspired by metal slug
+	Player controls a single shooter and tries to defend his castle against incoming enemies
+	Author: Zac Ler
+*/
+
+class Enemy{
+	
+	field int y_pos; // distance from ground to base of sprite
+	field int x_pos; // distance from left edge to left of sprite
+	field int move_cycle; // Current number of timestep
+	field int speed_delay;	// Number of timesteps before move
+
+
+	field int level;	// Monster level
+	field boolean stance; // Alternating stance
+	field int height; // Height of enemy (y axis)
+
+	field int time_elasped; // Estimated time taken
+	field int memAddress; // memory address of current xy position
+
+	/*
+		Create new enemy
+	*/
+	constructor Enemy new(int lvl, int x, int y) {
+		let level = lvl;
+		if (level = 1){ let height = 11; let speed_delay = 100;}
+		if (level = 2){ let height = 7; let speed_delay = 80;}
+		let y_pos = y;
+		let x_pos = x;
+		do draw();
+		return this;
+	}
+
+	/*
+		Main method called by game per cycle
+		Returns time elasped (0 if no moves are drawn)
+	*/
+	method int step(){
+		let time_elasped = 0;
+		if (move_cycle > speed_delay){
+    		let move_cycle = 0;
+			do move();
+    	}else{
+    		let move_cycle = move_cycle + 1;
+    	}
+		return time_elasped;
+	}
+
+	/*
+		Move enemy
+	*/
+	method void move(){
+		do clear();
+		let x_pos = x_pos - 16;
+		let stance = ~stance;
+		do draw();
+		return;
+	}
+
+	/*
+		Returns the Top Y Position
+	*/
+	method int getYTopBound(){
+		return y_pos+height+1;
+	}
+
+	/*
+		Returns the Bottom Y Position
+	*/
+	method int getYBottomBound(){
+		return y_pos-2;
+	}
+
+	/*
+		Return left X position
+	*/
+	method int getXBound(){
+		return x_pos;
+	}
+
+	/*
+		Update memAddress to reflect current pos
+		Note: movement along x-axis is jerky due to x_pos/16 calculation, in effect x-axis only has 32 columns
+	*/
+	method void updateLocationAddress(){
+		var int tranform_y; 
+		let tranform_y = 240 - height - y_pos; // when y_pos = 0, sprite is on the ground
+		let memAddress = 16384 + (x_pos/16) + (tranform_y * 32);
+		return;
+	}
+
+	/*
+		Clears the bitmap
+	*/
+	method void clear(){
+		var int i;
+		let i = 0;
+		do updateLocationAddress();
+		let time_elasped = time_elasped + height;
+		while (i<height){
+			do Memory.poke(memAddress + (i*32), 0);
+			let i = i + 1;
+		}
+		return;
+	}
+
+	/*
+		Draw sprite
+	*/
+	method void draw() {
+		do updateLocationAddress();
+		let time_elasped = time_elasped + height;
+		if(level = 1){
+			if (stance){
+				do Memory.poke(memAddress+0, 0);
+				do Memory.poke(memAddress+32, 1032);
+				do Memory.poke(memAddress+64, 2580);
+				do Memory.poke(memAddress+96, 4386);
+				do Memory.poke(memAddress+128, 4290);
+				do Memory.poke(memAddress+160, 480);
+				do Memory.poke(memAddress+192, 504);
+				do Memory.poke(memAddress+224, 192);
+				do Memory.poke(memAddress+256, 288);
+				do Memory.poke(memAddress+288, 528);
+				do Memory.poke(memAddress+320, 528);
+			}else{
+				do Memory.poke(memAddress+0, 3084);
+				do Memory.poke(memAddress+32, 4626);
+				do Memory.poke(memAddress+64, 288);
+				do Memory.poke(memAddress+96, 288);
+				do Memory.poke(memAddress+128, 192);
+				do Memory.poke(memAddress+160, 480);
+				do Memory.poke(memAddress+192, 504);
+				do Memory.poke(memAddress+224, 192);
+				do Memory.poke(memAddress+256, 816);
+				do Memory.poke(memAddress+288, 528);
+				do Memory.poke(memAddress+320, 0);
+			}
+		}
+		if (level = 2){
+				// Level 2 - L
+			if (stance){
+				do Memory.poke(memAddress+0, 0);
+				do Memory.poke(memAddress+32, 528);
+				do Memory.poke(memAddress+64, 1320);
+				do Memory.poke(memAddress+96, 2244);
+				do Memory.poke(memAddress+128, 480);
+				do Memory.poke(memAddress+160, 504);
+				do Memory.poke(memAddress+192, 192);
+			}else{
+				// Level 2 - R
+				do Memory.poke(memAddress+0, 7182);
+				do Memory.poke(memAddress+32, 528);
+				do Memory.poke(memAddress+64, 288);
+				do Memory.poke(memAddress+96, 192);
+				do Memory.poke(memAddress+128, 480);
+				do Memory.poke(memAddress+160, 504);
+				do Memory.poke(memAddress+192, 192);
+			}
+		}
+		
+		return;
+	}
+
+	/** Disposes this enemy. */
+	method int kill() {
+		do clear();
+	  	do Memory.deAlloc(this);
+	  	return level*10;
+	}
+	
+}

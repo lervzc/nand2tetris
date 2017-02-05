@@ -1,0 +1,18 @@
+/*
+	Castle Defense
+	Castle Defense is a simple shooter game inspired by metal slug
+	Player controls a single shooter and tries to defend his castle against incoming enemies
+	Author: Zac Ler
+*/
+/*
+	Main entry point for execution 
+*/
+class Main {
+    function void main() {
+        var CastleDefense game;
+        let game = CastleDefense.new();
+        do game.run();
+        do game.dispose();
+        return;
+    }
+}

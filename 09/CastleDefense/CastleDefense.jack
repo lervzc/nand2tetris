@@ -1,0 +1,411 @@
+/*
+	Castle Defense
+	Castle Defense is a simple shooter game inspired by metal slug
+	Player controls a single shooter and tries to defend his castle against incoming enemies
+	Author: Zac Ler
+*/
+
+/**
+* CastleDefense manages the game environment and object logic, the main game loop consist of 
+*	1) Reading & responding to inputs
+*	2) Moving bullets & enemies
+*	3) Checking collisions
+**/
+class CastleDefense{
+	static int game_delay;
+	field Gunman gunman; // Player (gunman)
+
+	field Array bulletObjects; // Bullets list
+	field Array enemiesObjects; // Enemies list
+
+	field int ammo, ammo_cap; // Number of bullets left, and its maximum capacity
+
+	field int life, score; // Player's life and score
+
+	field int enemies, max_enemies; // Number of enemies left, and its maximum capacity
+
+	field int game_level;	// Difficulty level
+	field int game_levelup_score; // Score to reach before level-up
+
+	field int spawn_level; // Enemy level (1 or 2)
+	field int rand_spawn_pos_max, rand_spawn_pos_min; // Top and bottom bound to spawn enemy (y axis)
+	field int rand_spawn_pos; // Current spawn position (y axis)
+	field boolean rand_spawn_direction; // True to move spawn pos upwards, false downwards
+	field int spawn_cycle; // Current number of steps taken
+	field int spawn_rate;  // Number of steps needed for an enemy to spawn
+
+	/*
+		Initialise configs
+	*/
+	constructor CastleDefense new() {
+		let game_delay = 10; // base game delay
+		let ammo_cap = 9;
+		let ammo = ammo_cap;
+		let life = 9;
+		let score = 0;
+		let max_enemies = 10;
+		let enemies = 0;
+		let game_level = 1;
+		let game_levelup_score = 80;
+
+		let spawn_level = 1;
+		let rand_spawn_pos =  20;
+		let rand_spawn_pos_max =  100;
+		let rand_spawn_pos_min =  20;
+		let rand_spawn_direction = true;
+		let spawn_rate = 2000; // 1 spawn per 1000 cycle
+		let spawn_cycle = 0;
+		return this;
+	}
+
+	/*
+		Show a welcome page
+	*/
+	method void show_landing(){
+		var int key;
+		do Output.moveCursor(8, 18);
+		do Output.printString("Welcome to Castle Defense!");
+		do Output.moveCursor(10, 16);
+		do Output.printString("[space] to jump, [a] to shoot");
+		do Output.moveCursor(12, 12);
+		do Output.printString("best experienced at max simulator speed");
+		do Output.moveCursor(14, 19);
+		do Output.printString("press any key to start");
+		// waits for a key to be pressed
+		while (key = 0) {
+			let key = Keyboard.keyPressed();
+			do Sys.wait(50);
+		}
+		// clears prompt
+		do Screen.setColor(false);
+		do Screen.drawRectangle(0, 0, 511, 255);
+		// do Output.moveCursor(8, 18);
+		// do Output.printString("                                 ");
+		// do Output.moveCursor(10, 16);
+		// do Output.printString("                                 ");
+		// do Output.moveCursor(12, 12);
+		// do Output.printString("                                         ");
+		// do Output.moveCursor(14, 19);
+		// do Output.printString("                                 ");
+		return;
+	}
+
+	/*
+		Creates game environment, initialises gunman and draws castle
+		Screen is 256 rows by 512 columns
+	*/
+	method void setup_env() {
+		var int i;
+
+		let gunman = Gunman.new();
+
+		let bulletObjects = Array.new(ammo_cap);
+		let enemiesObjects = Array.new(max_enemies);
+		// Initialise to -1
+		let i = 0;
+		while( i < ammo_cap){
+			let bulletObjects[i] = -1;
+			let i = i + 1;
+		}
+		let i = 0;
+		while( i < max_enemies){
+			let enemiesObjects[i] = -1;
+			let i = i + 1;
+		}
+		do Screen.setColor(true);
+		// Draws castle's triangle
+		do Screen.drawLine(0, 140, 20, 120);
+		do Screen.drawLine(20, 120, 40, 140);
+
+		// Draws castle
+		do Screen.drawLine(0, 140, 40, 140);
+		do Screen.drawLine(40, 140, 40, 240);
+
+		// Ground line
+		do Screen.drawLine(0, 240, 511, 240); 
+
+		// Print game stats
+		do Output.moveCursor(2, 3);
+		do Output.printString("Life:");
+		do Output.printInt(life);
+
+		do Output.moveCursor(2, 14);
+		do Output.printString("Ammo:");
+		do Output.printInt(ammo_cap);
+
+		do Output.moveCursor(2, 23);
+		do Output.printString("Level:");
+		do Output.printInt(game_level);
+
+		do Output.moveCursor(2, 35);
+		do Output.printString("Score:");
+		do Output.printInt(score);
+
+		return;
+	}
+
+
+	/*
+		Updates ammo, score and life counts on screen
+	*/
+	method void update_ammo(){
+		do Output.moveCursor(2, 19);
+		do Output.printInt(ammo);
+		return; 
+	}
+
+	method void update_score(){
+		do Output.moveCursor(2, 41);
+		do Output.printInt(score);
+		return; 
+	}
+
+	method void update_life(){
+		do Output.moveCursor(2, 8);
+		do Output.printInt(life);
+		return; 
+	}
+
+	method void update_level(){
+		do Output.moveCursor(2, 29);
+		do Output.printInt(game_level);
+		return; 
+	}
+
+	/* 					Bullet controller 			*/
+	/*
+		Add an game bullet into world
+		Slots the address of the object into an empty slot
+	*/
+	method boolean addBullet(Bullet obj){
+		var int i;
+		let i = 0;
+		while(~(bulletObjects[i] = -1) & (i < ammo_cap)){
+			let i = i + 1;
+		}
+		if (bulletObjects[i] = -1){
+			let bulletObjects[i] = obj;
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+	/*
+		Move player's bullets by a single timestep
+		Removes bullet if collision detected
+	*/
+	method int move_bullets(){
+		var int i, time_elasped;
+		var Bullet b;
+		let time_elasped = 0;
+		let i = 0;
+
+		while( i < ammo_cap){
+			if(~(bulletObjects[i] = -1)){
+				let b = bulletObjects[i];
+				let time_elasped = time_elasped + b.step();
+				if(checkCollision(b)){
+					// remove bullets
+					do b.dispose();
+					let bulletObjects[i] = -1;
+					let ammo =  ammo + 1;
+					do update_ammo();
+				}
+			}
+			let i = i + 1;
+		}
+		
+		return time_elasped;
+	}
+	/*
+		Check for bullet collision with other game objects
+		Returns true if when collide
+	*/
+	method boolean checkCollision(Bullet b){
+		var int i,j;
+		var Enemy e;
+		var int bullet_x_pos, bullet_y_pos;
+		let bullet_x_pos = b.getXBound();
+		if( bullet_x_pos > 512){
+			return true; // hits the wall
+		}
+
+		let bullet_y_pos = b.getYBound();
+		let i = 0; // index
+		let j = 0; // enemy count
+		while(j < enemies){
+			if(~(enemiesObjects[i] = -1)){
+				let e = enemiesObjects[i];
+				if(bullet_x_pos > e.getXBound()){
+					if (bullet_y_pos < e.getYTopBound() & bullet_y_pos > e.getYBottomBound()) {
+						// enemy killed
+						let score =  score + e.kill();
+						let enemiesObjects[i] = -1;
+						let enemies =  enemies - 1;
+
+						// Change in score and difficulty level
+						if(score > game_levelup_score){
+							let game_level = game_level + 1;
+							// 80, 160, 320, 640, 1280, 2560
+							let game_levelup_score = game_levelup_score * 2;
+							// 2000, 1600, 1280, 1024 
+							let spawn_rate = spawn_rate - (spawn_rate/5);
+							if (game_level = 3){let spawn_level = 2;} 
+							do update_level();
+						}
+						if (game_level > 5){
+							if (spawn_level = 2){ let spawn_level = 1;}
+							else {let spawn_level = 2;}
+						} 
+						do update_score();
+						return true;
+					}
+				}
+				let j = j + 1;
+			}
+			let i = i + 1;
+		}
+		return false;
+	}
+
+	/* 					Enemy controller			*/
+	/*
+		Move enemies by a step
+	*/
+	method int move_enemies(){
+		var int i, j, time_elasped;
+		var Enemy e;
+		let time_elasped = 0;
+		let i = 0;
+		let j = 0;
+		while( j < enemies){
+			if(~(enemiesObjects[i] = -1)){
+				let e = enemiesObjects[i];
+				let time_elasped = time_elasped + e.step();
+				if(e.getXBound() < 40){ // enemy reaches the castle
+					do e.kill();
+					let enemiesObjects[i] = -1; // mark slot as empty
+					let enemies =  enemies - 1;
+					let life = life - 1;
+					do update_life();
+				}
+				let j = j + 1;
+			}
+			let i = i + 1;
+		}
+		
+		return time_elasped;
+	}
+
+	/*
+		Moves monster spawn position (cursor) along y axis
+		This method is called on user hitting fire or jump keys
+	*/
+	method void moveSpawnPos(){
+		if (rand_spawn_pos > rand_spawn_pos_max)
+		{
+			let rand_spawn_pos =  rand_spawn_pos_max - 1;
+			let rand_spawn_direction = ~rand_spawn_direction;
+			return;
+		}
+		if (rand_spawn_pos < rand_spawn_pos_min){
+			let rand_spawn_pos =  rand_spawn_pos_min + 1;
+			let rand_spawn_direction = ~rand_spawn_direction;
+			return;
+		}
+		if (rand_spawn_direction){
+			let rand_spawn_pos = rand_spawn_pos + ammo; // use current ammo amount as random amount to move
+		}else{
+			let rand_spawn_pos = rand_spawn_pos - ammo;
+		}
+		return;
+	}
+
+	/*
+		Spawn an enemy
+	*/
+	method void spawnEnemy(){
+		var int i;
+		if(enemies > (max_enemies-1)){return;}
+
+        let enemies = enemies + 1; 	
+		let i = 0;
+		while(~(enemiesObjects[i] = -1) & (i < max_enemies)){
+			let i = i + 1;
+		}
+		if (enemiesObjects[i] = -1){
+			let enemiesObjects[i] = Enemy.new(spawn_level, 496, rand_spawn_pos);
+		}
+		
+		return;
+	}
+
+
+	/*					Game controller 				*/
+	/*
+		Trigger a timestep for every world object
+	*/
+	method void world_loop(){
+		var int time_elasped;
+		let time_elasped = gunman.step();
+		let time_elasped = time_elasped + move_bullets();
+		let time_elasped = time_elasped + move_enemies();
+		if (time_elasped < game_delay){ // Executes a delay if no draws are performed
+			do Sys.wait(game_delay - time_elasped);
+		}
+		let spawn_cycle = spawn_cycle + 1;
+		if (spawn_cycle > spawn_rate){
+			do spawnEnemy();
+			let spawn_cycle = 0;
+		}
+		return;
+	}
+
+	/** Runs the game: handles the user's inputs and moves the square accordingly */
+    method void run() {
+      var char key;  // the key currently pressed by the user
+      var Bullet b;
+      do show_landing();
+      
+      do setup_env();
+
+      while (life > 0) {
+         // waits for a key to be pressed
+         while (key = 0) {
+            let key = Keyboard.keyPressed();
+            do world_loop();
+         }
+         if (key = 32) { do gunman.jump(); do moveSpawnPos();}   // space key
+         if (key = 83) { // s key
+         	do spawnEnemy();
+         }   
+         if (key = 65) { // a key
+         	if (ammo > 0){
+	         	let b = gunman.fire();
+	         	do addBullet(b);
+	         	let ammo =  ammo - 1;
+	         	do update_ammo();
+         	}
+         	do moveSpawnPos();
+         }   
+
+         // waits for the key to be released
+         while (~(key = 0)) {
+            let key = Keyboard.keyPressed();
+            //do gunman.step();
+            do world_loop();
+         }
+     } // while
+     do Output.moveCursor(9, 25);
+	 do Output.printString("GAME OVER");
+     return;
+    }
+    
+	/** Disposes this game. */
+	method void dispose() {
+	  do gunman.dispose();
+	  do Memory.deAlloc(this);
+	  return;
+	}
+}

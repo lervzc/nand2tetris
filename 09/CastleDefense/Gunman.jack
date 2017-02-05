@@ -1,0 +1,213 @@
+/*
+	Castle Defense
+	Castle Defense is a simple shooter game inspired by metal slug
+	Player controls a single shooter and tries to defend his castle against incoming enemies
+	Author: Zac Ler
+*/
+/** Implements a Gunman Object */
+class Gunman{
+	field int y_pos; // distance from ground to base of sprite
+	field int x_pos; // distance from left to left of sprite
+	field int stance;// 1, 2 = Walking |  3 = Jumping
+	field int step_cycle; // Number of timesteps before taking a step
+	field int jump_cycle; // Number of timesteps before changing position
+	field int velocity; // Change in y_pos units
+	field int jumps; // Number of jumps taken
+	field int jump_cap; // maximum jumps before landing
+	field int time_elasped; // Estimated time taken
+	field int memAddress; // memory address of current xy position
+
+	/*
+		Creates a new Gunman
+	*/
+	constructor Gunman new() {
+		let y_pos = 0;
+		let x_pos = 70;
+		let jump_cap = 2;
+		let stance = 0;
+		do draw();
+		return this;
+	}
+
+	/*
+		Take a single timestep
+		- If step cycle is reached change a stance
+		- If jump cycle is reached apply gravity and move gunman
+		Time elasped estimates the computational cycles elasped
+	*/
+	method int step(){
+		let time_elasped = 0;
+		if (step_cycle > 120){
+    		let step_cycle = 0;
+    		if (stance = 1){ let stance = 0;}
+			else {
+				if (stance = 0){ let stance = 1;}
+			}
+			do draw();
+    	}else{
+    		let step_cycle = step_cycle + 1;
+    	}
+		
+		if (stance = 2){ // jump stance
+			if (jump_cycle > 50){
+	    		let jump_cycle = 0;
+	    		do clear();
+				let y_pos = y_pos + velocity;
+				let velocity = velocity - 1;
+
+				if (y_pos < 0){ // touch ground
+					let jumps = 0;
+					let velocity = 0;
+					let stance = 0;
+					let y_pos = 0;
+				}
+				do draw();
+	    	}else{
+	    		let jump_cycle = jump_cycle + 1;
+	    	}
+		}
+		
+		return time_elasped;
+	}
+	/*
+		Execute a jump
+	*/
+	method void jump(){
+		if (jumps < jump_cap){ 
+			let jumps = jumps + 1;
+			let velocity = 10;
+			let stance = 2;
+			do draw_jump();
+			do step();
+		}
+		return;
+	}
+
+	/*
+		Create a new bullet at gun position
+	*/
+	method Bullet fire(){
+		var Bullet b;
+		let b = Bullet.new(x_pos+15, y_pos+6);
+		return b;
+	}
+
+	/*
+		Draws sprite
+	*/
+	method void draw(){
+		let time_elasped = time_elasped + 16; // fixed time for draws
+		if (stance < 2){ do draw_walk();}
+		if (stance = 2){ do draw_jump();}
+		return;
+	}
+
+	/*
+		Updates memory address to reflect current position
+		x_pos - distance from left
+		y_pos - distance from ground
+	*/
+	method int updateLocationAddress(){
+		var int tranform_y; 
+		let tranform_y = 224 - y_pos;
+		let memAddress = 16384 + (x_pos/16) + (tranform_y * 32);
+		return memAddress;
+	}
+
+	/*
+		Draws a bitmap of gunman, alternates between 2 stances
+	*/
+	method void draw_walk() {
+		do updateLocationAddress();
+		if(stance = 1){
+			do Memory.poke(memAddress+0, 384);
+			do Memory.poke(memAddress+32, 576);
+			do Memory.poke(memAddress+64, 1056);
+			do Memory.poke(memAddress+96, 1120);
+			do Memory.poke(memAddress+128, 1600);
+			do Memory.poke(memAddress+160, 384);
+			do Memory.poke(memAddress+192, 576);
+			do Memory.poke(memAddress+224, 1312);
+			do Memory.poke(memAddress+256, 16352);
+			do Memory.poke(memAddress+288, 576);
+			do Memory.poke(memAddress+320, 576);
+			do Memory.poke(memAddress+352, 384);
+			do Memory.poke(memAddress+384, 704);
+			do Memory.poke(memAddress+416, 1728);
+			do Memory.poke(memAddress+448, 1728);
+			do Memory.poke(memAddress+480, 3520);
+		}
+		else{
+			do Memory.poke(memAddress+0, 384);
+			do Memory.poke(memAddress+32, 576);
+			do Memory.poke(memAddress+64, 1056);
+			do Memory.poke(memAddress+96, 1120);
+			do Memory.poke(memAddress+128, 1600);
+			do Memory.poke(memAddress+160, 384);
+			do Memory.poke(memAddress+192, 1088);
+			do Memory.poke(memAddress+224, 2592);
+			do Memory.poke(memAddress+256, 32736);
+			do Memory.poke(memAddress+288, 1600);
+			do Memory.poke(memAddress+320, 960);
+			do Memory.poke(memAddress+352, 960);
+			do Memory.poke(memAddress+384, 864);
+			do Memory.poke(memAddress+416, 1584);
+			do Memory.poke(memAddress+448, 1560);
+			do Memory.poke(memAddress+480, 7740);
+		}
+		return;
+	}
+	/*
+		Draws the gunman in jumping position
+	*/
+	method void draw_jump() {
+		do updateLocationAddress();
+		do Memory.poke(memAddress+0, 384);
+		do Memory.poke(memAddress+32, 576);
+		do Memory.poke(memAddress+64, 1056);
+		do Memory.poke(memAddress+96, 17504);
+		do Memory.poke(memAddress+128, 9792);
+		do Memory.poke(memAddress+160, 4992);
+		do Memory.poke(memAddress+192, 3648);
+		do Memory.poke(memAddress+224, 1312);
+		do Memory.poke(memAddress+256, 992);
+		do Memory.poke(memAddress+288, 576);
+		do Memory.poke(memAddress+320, 960);
+		do Memory.poke(memAddress+352, 2016);
+		do Memory.poke(memAddress+384, 3696);
+		do Memory.poke(memAddress+416, 7228);
+		do Memory.poke(memAddress+448, 14360);
+		do Memory.poke(memAddress+480, 0);
+		return;
+	}
+	/*
+		Clears the bitmap
+	*/
+	method void clear(){
+		do updateLocationAddress();
+		do Memory.poke(memAddress+0, 0);
+		do Memory.poke(memAddress+32, 0);
+		do Memory.poke(memAddress+64, 0);
+		do Memory.poke(memAddress+96, 0);
+		do Memory.poke(memAddress+128, 0);
+		do Memory.poke(memAddress+160, 0);
+		do Memory.poke(memAddress+192, 0);
+		do Memory.poke(memAddress+224, 0);
+		do Memory.poke(memAddress+256, 0);
+		do Memory.poke(memAddress+288, 0);
+		do Memory.poke(memAddress+320, 0);
+		do Memory.poke(memAddress+352, 0);
+		do Memory.poke(memAddress+384, 0);
+		do Memory.poke(memAddress+416, 0);
+		do Memory.poke(memAddress+448, 0);
+		do Memory.poke(memAddress+480, 0);
+		return;
+	}
+
+	/** Disposes this gunman. */
+	method void dispose() {
+		do clear();
+	  	do Memory.deAlloc(this);
+	  	return;
+	}
+}
